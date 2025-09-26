@@ -27,8 +27,13 @@ const payment = new Payment(client);
 
 // Ruta para crear una preferencia de pago
 app.post('/create-preference', async (req, res) => {
+  console.log('🔵 INICIO: Solicitud recibida para crear preferencia');
+  console.log('📝 Datos recibidos:', req.body);
+  
   try {
     const { nombre, email, servicio, precio } = req.body;
+    console.log(`👤 Datos del cliente - Nombre: ${nombre}, Email: ${email}`);
+    console.log(`🛒 Datos del servicio - Servicio: ${servicio}, Precio: ${precio}`);
     
     // Creamos el objeto de preferencia según la documentación de Mercado Pago
     const preferenceData = {
@@ -52,51 +57,79 @@ app.post('/create-preference', async (req, res) => {
       // Esta URL recibirá notificaciones de los cambios de estado del pago
       notification_url: `${process.env.BACKEND_URL || "https://your-backend-subdomain.loca.lt"}/webhook`
     };
+    
+    console.log('📋 Objeto de preferencia creado:', JSON.stringify(preferenceData, null, 2));
+    console.log('🔄 Enviando solicitud a Mercado Pago...');
 
     // Creamos la preferencia en Mercado Pago
     const response = await preference.create({ body: preferenceData });
     
-    // Respondemos con la URL de pago
+    console.log('✅ Preferencia creada exitosamente');
+    console.log('🆔 Preference ID:', response.id);
+    console.log('🔗 URL de pago (init_point):', response.init_point);
+    console.log('📊 Respuesta completa de Mercado Pago:', JSON.stringify(response, null, 2));
+    
+    // Respondemos con la URL de pago y el ID de preferencia
     res.json({
       success: true,
-      redirectUrl: response.init_point
+      redirectUrl: response.init_point,
+      preferenceId: response.id
     });
+    
+    console.log('🟢 FIN: Respuesta enviada al cliente');
   } catch (error) {
-    console.error('Error al crear la preferencia:', error);
+    console.error('🔴 ERROR al crear la preferencia:', error);
+    console.error('📄 Detalles del error:', JSON.stringify(error, null, 2));
     res.status(500).json({
       success: false,
       error: 'Error al crear la preferencia de pago'
     });
+    console.log('🔴 FIN: Respuesta de error enviada al cliente');
   }
 });
 
 // Ruta para recibir notificaciones de Mercado Pago (webhook)
 app.post('/webhook', async (req, res) => {
+  console.log('🔵 INICIO: Webhook recibido de Mercado Pago');
+  console.log('📝 Datos del webhook:', req.body);
+  
   try {
     const { type, data } = req.body;
+    console.log(`📌 Tipo de notificación: ${type}`);
+    console.log(`📄 Datos recibidos: ${JSON.stringify(data, null, 2)}`);
     
     // Solo procesamos notificaciones de tipo 'payment'
     if (type === 'payment') {
       const paymentId = data.id;
+      console.log(`💰 ID de pago recibido: ${paymentId}`);
+      console.log('🔄 Consultando información del pago a Mercado Pago...');
       
       // Obtenemos la información del pago desde Mercado Pago
       const paymentInfo = await payment.get({ id: paymentId });
       
+      console.log('📊 Información completa del pago:', JSON.stringify(paymentInfo, null, 2));
+      console.log(`📊 Estado del pago: ${paymentInfo.status}`);
+      
       // Verificamos si el pago fue aprobado
       if (paymentInfo.status === 'approved') {
+        console.log('✅ Pago APROBADO');
         // Aquí implementarías la lógica para enviar el email al cliente
-        console.log('Pago aprobado:', paymentInfo);
-        
-        // Ejemplo: Enviar email (aquí deberías integrar tu servicio de email)
-        // await enviarEmail(paymentInfo.payer.email, 'Acceso a la aplicación', 'Aquí están tus datos de acceso...');
+        console.log('📧 Aquí se enviaría el email al cliente');
+      } else {
+        console.log(`ℹ️ Pago en estado: ${paymentInfo.status}`);
       }
+    } else {
+      console.log(`ℹ️ Tipo de notificación no procesada: ${type}`);
     }
     
     // Respondemos con éxito para que Mercado Pago sepa que recibimos la notificación
     res.status(200).send('OK');
+    console.log('🟢 FIN: Respuesta 200 OK enviada a Mercado Pago');
   } catch (error) {
-    console.error('Error en el webhook:', error);
+    console.error('🔴 ERROR en el webhook:', error);
+    console.error('📄 Detalles del error:', JSON.stringify(error, null, 2));
     res.status(500).send('Error al procesar la notificación');
+    console.log('🔴 FIN: Respuesta de error enviada a Mercado Pago');
   }
 });
 
