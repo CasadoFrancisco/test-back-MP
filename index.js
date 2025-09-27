@@ -94,42 +94,49 @@ app.post('/webhook', async (req, res) => {
   console.log('📝 Datos del webhook:', req.body);
   
   try {
-    const { type, data } = req.body;
+    const { type, data, action } = req.body;
     console.log(`📌 Tipo de notificación: ${type}`);
+    console.log(`📌 Acción: ${action}`);
     console.log(`📄 Datos recibidos: ${JSON.stringify(data, null, 2)}`);
     
-    // Solo procesamos notificaciones de tipo 'payment'
-    if (type === 'payment') {
-      const paymentId = data.id;
+    // Procesamos notificaciones de tipo 'payment' o acción 'payment.updated'
+    if (type === 'payment' || action === 'payment.updated') {
+      // Extraemos el ID del pago correctamente según la estructura
+      const paymentId = typeof data === 'object' && data.id ? data.id : data;
       console.log(`💰 ID de pago recibido: ${paymentId}`);
       console.log('🔄 Consultando información del pago a Mercado Pago...');
       
-      // Obtenemos la información del pago desde Mercado Pago
-      const paymentInfo = await payment.get({ id: paymentId });
-      
-      console.log('📊 Información completa del pago:', JSON.stringify(paymentInfo, null, 2));
-      console.log(`📊 Estado del pago: ${paymentInfo.status}`);
-      
-      // Verificamos si el pago fue aprobado
-      if (paymentInfo.status === 'approved') {
-        console.log('✅ Pago APROBADO');
-        // Aquí implementarías la lógica para enviar el email al cliente
-        console.log('📧 Aquí se enviaría el email al cliente');
-      } else {
-        console.log(`ℹ️ Pago en estado: ${paymentInfo.status}`);
+      try {
+        // Obtenemos la información del pago desde Mercado Pago
+        const paymentInfo = await payment.get({ id: paymentId });
+        
+        console.log('📊 Información completa del pago:', JSON.stringify(paymentInfo, null, 2));
+        console.log(`📊 Estado del pago: ${paymentInfo.status}`);
+        
+        // Verificamos si el pago fue aprobado
+        if (paymentInfo.status === 'approved') {
+          console.log('✅ Pago APROBADO');
+          // Aquí implementarías la lógica para enviar el email al cliente
+          console.log('📧 Aquí se enviaría el email al cliente');
+        } else {
+          console.log(`ℹ️ Pago en estado: ${paymentInfo.status}`);
+        }
+      } catch (paymentError) {
+        console.error('🔴 Error al obtener información del pago:', paymentError);
+        // Respondemos OK aunque haya error al consultar el pago
+        // para que Mercado Pago no reintente la notificación
       }
-    } else {
-      console.log(`ℹ️ Tipo de notificación no procesada: ${type}`);
     }
     
-    // Respondemos con éxito para que Mercado Pago sepa que recibimos la notificación
+    // Siempre respondemos con éxito para que Mercado Pago no reintente
     res.status(200).send('OK');
-    console.log('🟢 FIN: Respuesta 200 OK enviada a Mercado Pago');
+    console.log('🔵 FIN: Respuesta enviada al webhook');
+    
   } catch (error) {
-    console.error('🔴 ERROR en el webhook:', error);
-    console.error('📄 Detalles del error:', JSON.stringify(error, null, 2));
-    res.status(500).send('Error al procesar la notificación');
-    console.log('🔴 FIN: Respuesta de error enviada a Mercado Pago');
+    console.error('🔴 ERROR en el procesamiento del webhook:', error);
+    // Aún con error, respondemos 200 para que Mercado Pago no reintente
+    res.status(200).send('OK');
+    console.log('🔴 FIN: Respuesta de error controlado enviada al webhook');
   }
 });
 
