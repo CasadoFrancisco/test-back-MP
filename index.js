@@ -91,7 +91,10 @@ app.post('/create-preference', async (req, res) => {
 // Ruta para recibir notificaciones de Mercado Pago (webhook)
 app.post('/webhook', async (req, res) => {
   console.log('🔵 INICIO: Webhook recibido de Mercado Pago');
-  console.log('📝 Datos del webhook:', req.body);
+  console.log('📝 Datos del webhook:', JSON.stringify(req.body, null, 2));
+  
+  // Respondemos inmediatamente con éxito para evitar timeout
+  res.status(200).send('OK');
   
   try {
     const { type, data, action } = req.body;
@@ -104,6 +107,13 @@ app.post('/webhook', async (req, res) => {
       // Extraemos el ID del pago correctamente según la estructura
       const paymentId = typeof data === 'object' && data.id ? data.id : data;
       console.log(`💰 ID de pago recibido: ${paymentId}`);
+      
+      // Para pruebas, si el ID es muy corto (como "12"), simplemente lo registramos sin consultar a la API
+      if (paymentId === "12" || paymentId.length < 5) {
+        console.log('⚠️ ID de prueba detectado, omitiendo consulta a la API');
+        return;
+      }
+      
       console.log('🔄 Consultando información del pago a Mercado Pago...');
       
       try {
@@ -123,20 +133,13 @@ app.post('/webhook', async (req, res) => {
         }
       } catch (paymentError) {
         console.error('🔴 Error al obtener información del pago:', paymentError);
-        // Respondemos OK aunque haya error al consultar el pago
-        // para que Mercado Pago no reintente la notificación
       }
     }
     
-    // Siempre respondemos con éxito para que Mercado Pago no reintente
-    res.status(200).send('OK');
-    console.log('🔵 FIN: Respuesta enviada al webhook');
+    console.log('🔵 FIN: Procesamiento del webhook completado');
     
   } catch (error) {
     console.error('🔴 ERROR en el procesamiento del webhook:', error);
-    // Aún con error, respondemos 200 para que Mercado Pago no reintente
-    res.status(200).send('OK');
-    console.log('🔴 FIN: Respuesta de error controlado enviada al webhook');
   }
 });
 
